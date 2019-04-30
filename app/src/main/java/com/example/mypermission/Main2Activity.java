@@ -5,12 +5,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 /**
@@ -20,23 +21,34 @@ import android.widget.Toast;
  * 写一个界面，程序需要获取您的权限
  * 然后请求权限就不分那么多种了，直接请求和判断是否授权，如果没有授权就显示程序需要获取您的权限
  * 点击跳到系统设置界面。
+ *
+ *
+ * 如果每个权限的地方都这么弄，那不费劲死了？
+ *
  */
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+public class Main2Activity extends AppCompatActivity implements View.OnClickListener {
 
     private static final String TAG = "cj";
     private Button mBtPhone;
+    private RelativeLayout rl_permission;
+    private Button bt_request_permission;
+    private RelativeLayout rl_bg;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main2);
         initView();
     }
 
     private void initView() {
         mBtPhone = findViewById(R.id.bt_phone);
+        rl_bg = findViewById(R.id.rl_bg);
+        rl_permission = findViewById(R.id.rl_permission);
+        bt_request_permission = findViewById(R.id.bt_request_permission);
 
         mBtPhone.setOnClickListener(this);
+        bt_request_permission.setOnClickListener(this);
     }
 
     @Override
@@ -44,6 +56,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (v.getId()) {
             case R.id.bt_phone:
                 checkCallPermission();
+
+                break;
+            case R.id.bt_request_permission:
+                boolean show = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CALL_PHONE);
+                if (!show) {
+                    Intent intent = new Intent();
+                    intent.setAction("android.settings.APPLICATION_DETAILS_SETTINGS");
+                    intent.setData(Uri.fromParts("package", getPackageName(), null));
+                    startActivityForResult(intent, 0);
+                } else {
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CALL_PHONE}, 1);
+                }
 
                 break;
         }
@@ -54,6 +78,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * 打电话的方法
      */
     public void doCall() {
+        rl_bg.setVisibility(View.GONE);
+        rl_permission.setVisibility(View.GONE);
 //        Intent intentPhone = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:15538307513"));//拨号界面
         Intent intentPhone = new Intent(Intent.ACTION_CALL, Uri.parse("tel:15538307513"));//直接拨打
         startActivity(intentPhone);
@@ -66,27 +92,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void checkCallPermission() {
         //运行时权限
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-
-            boolean b = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CALL_PHONE);
-            //有没有"不再提示"的chexkbox，第一次没有，所以返回false，执行else里面的内容
-            //第二次以后有，为true
-            //若勾选不再提醒，就又变成false了。
-
-            if (b == true) {
-
-                Log.e(TAG, "checkCallPermission:  true" );
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CALL_PHONE}, 2);
-                //一调用就会弹出选择对话框，第二.三.四次弹出的对话框，不管点击接受或拒绝，都会回调下面的方法，请求码是2.特殊的是如果一旦勾选了不再提示，再点击的时候就只会执行下面2的else里的代码了。
-
-
-            } else {
-                Log.e(TAG, "checkCallPermission:  false" );
-
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CALL_PHONE}, 1);
-                //一调用就会弹出选择对话框，第一次弹出的对话框，不管点击接受或拒绝，都会回调下面的方法，请求码是1.把判断扔给回调方法，推卸责任。
-
-            }
-
+            rl_bg.setVisibility(View.VISIBLE);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CALL_PHONE}, 1);
         } else {
 
             doCall();
@@ -108,39 +115,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         switch (requestCode) {
             case 1:
-                //第一次
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    //接受
-
                     doCall();
-
                 } else {
-                    //拒绝
-
-                    Toast.makeText(MainActivity.this, "您拒绝了打电话权限", Toast.LENGTH_SHORT).show();
+                    rl_permission.setVisibility(View.VISIBLE);
                 }
 
                 break;
 
-            case 2:
-                //第二。三。。。次
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    //接受
-                    doCall();
-                } else {
-                    //拒绝
-                    Toast.makeText(MainActivity.this, "您可以去设置，应用里面打开权限", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent();
-                    intent.setAction("android.settings.APPLICATION_DETAILS_SETTINGS");
-                    intent.setData(Uri.fromParts("package", getPackageName(), null));
-                    startActivity(intent);
-
-
-                }
-
-                break;
         }
 
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(Main2Activity.this, "您拒绝了打电话权限", Toast.LENGTH_SHORT).show();
+        } else {
+            doCall();
+        }
 
     }
 }
